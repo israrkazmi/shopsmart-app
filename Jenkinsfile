@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/israrkazmi/shopsmart-app.git'
+            }
+        }
+        stage('Test') {
+            steps {
+                echo 'Starting ShopSmart App and Running 15 Selenium Test Cases...'
+                sh '''
+                    python3 -m venv venv
+                    source venv/bin/activate
+                    pip install -r requirements.txt selenium pytest
+                    python app.py & 
+                    sleep 10 
+                    ./venv/bin/pytest tests/test_shopsmart.py
+                    pkill -f "python app.py" || true
+                '''
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t shopsmart-app .'
+            }
+        }
+    }
+    post {
+        always {
+            emailext (
+                subject: "ShopSmart Tests: ${currentBuild.currentResult} - Build #${env.BUILD_NUMBER}",
+                body: """Build Result: ${currentBuild.currentResult}
+                
+--------------------------------------------------
+AUTOMATED TEST SESSION LOG:
+--------------------------------------------------
+\${BUILD_LOG, maxLines=100, escapeHtml=false}
+--------------------------------------------------
+
+Full Build Details: ${env.BUILD_URL}""",
+                recipientProviders: [culprits(), developers()]
+            )
+        }
+    }
+}
