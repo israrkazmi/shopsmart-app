@@ -10,12 +10,22 @@ pipeline {
             steps {
                 echo 'Starting ShopSmart App and Running 15 Selenium Test Cases...'
                 sh '''
+                    # Setup virtual environment
                     python3 -m venv venv
                     . venv/bin/activate
+                    
+                    # Install dependencies
                     pip install -r requirements.txt selenium pytest
+                    
+                    # Start the application in the background
                     python app.py & 
-                    sleep 10 
-                    pytest tests/test_shopsmart.py
+                    sleep 15 
+                    
+                    # Run all tests found in the tests folder
+                    # This fixes the "file or directory not found" error
+                    pytest tests/
+                    
+                    # Clean up the background process
                     pkill -f "python app.py" || true
                 '''
             }
