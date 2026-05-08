@@ -6,43 +6,45 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/israrkazmi/shopsmart-app.git'
             }
         }
-        stage('Test') {
-            steps {
-                echo 'Starting ShopSmart App and Running 15 Selenium Test Cases...'
-                sh '''
-                    # Setup virtual environment
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    
-                    # Install dependencies
-                    pip install -r requirements.txt selenium pytest
-                    
-                    # Start the application in the background
-                    python app.py & 
-                    sleep 15 
-                    
-                    # Run all tests found in the tests folder
-                    # This fixes the "file or directory not found" error
-                    pytest tests/
-                    
-                    # Clean up the background process
-                    pkill -f "python app.py" || true
-                '''
-            }
-        }
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t shopsmart-app .'
-            }
-        }
+stage('Test') {
+    steps {
+        sh '''
+            . venv/bin/activate
+            # Generate the XML report that Jenkins can read
+            pytest --junitxml=results.xml tests/
+        '''
     }
+}
+
 post {
     always {
+        // 1. Process the test results so Jenkins knows the pass/fail count
+        junit 'results.xml'
+        
+        // 2. Send the dynamic email
         emailext (
-            subject: "Status: ${currentBuild.fullDisplayName}",
-            body: "Build finished with status: ${currentBuild.currentResult}",
-            recipientProviders: [[$class: 'CulpritsRecipientProvider'], [$class: 'RequesterRecipientProvider']]
+            subject: "ShopSmart Build: ${currentBuild.fullDisplayName} - ${currentBuild.currentResult}",
+            body: """
+                Build Status: ${currentBuild.currentResult}
+                
+                --- TEST SUMMARY ---
+                ${testCounts}
+                
+                Detailed Results:
+                - Passed: ${TEST_COUNTS, var="pass"}
+                - Failed: ${TEST_COUNTS, var="fail"}
+                - Skipped: ${TEST_COUNTS, var="skip"}
+                
+                Check the full report and logs here: ${env.BUILD_URL}
+            """,
+            // This makes the 'To' field dynamic
+            recipientProviders: [
+                [$class: 'RequesterRecipientProvider'], // Sends to the person who clicked "Build"
+                [$class: 'CulpritsRecipientProvider']   // Sends to the person who committed the code
+            ],
+            // Optional: keep your main email as a fallback/cc
+            to: 'syedisrarkazmi091@gmail.com'
         )
     }
 }
-}
+    }
