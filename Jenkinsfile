@@ -11,11 +11,11 @@ pipeline {
                 echo 'Starting ShopSmart App and Running 15 Selenium Test Cases...'
                 sh '''
                     python3 -m venv venv
-                    source venv/bin/activate
+                    . venv/bin/activate
                     pip install -r requirements.txt selenium pytest
                     python app.py & 
                     sleep 10 
-                    ./venv/bin/pytest tests/test_shopsmart.py
+                    pytest tests/test_shopsmart.py
                     pkill -f "python app.py" || true
                 '''
             }
@@ -29,6 +29,7 @@ pipeline {
     post {
         always {
             emailext (
+                to: 'kazmiisrar@gmail.com',
                 subject: "ShopSmart Tests: ${currentBuild.currentResult} - Build #${env.BUILD_NUMBER}",
                 body: """Build Result: ${currentBuild.currentResult}
                 
@@ -39,7 +40,6 @@ AUTOMATED TEST SESSION LOG:
 --------------------------------------------------
 
 Full Build Details: ${env.BUILD_URL}""",
-                recipientProviders: [culprits(), developers()]
             )
         }
     }
