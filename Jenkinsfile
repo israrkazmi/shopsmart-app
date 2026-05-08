@@ -1,13 +1,26 @@
 pipeline {
     agent any
 
+    environment {
+        // Adding Python to PATH just in case
+        PATH = "/var/lib/jenkins/workspace/shopsmart-pipeline/venv/bin:$PATH"
+    }
+
     stages {
-        // ... (Checkout and other stages here)
+        stage('Checkout') {
+            steps {
+                // Pulling your ShopSmart code
+                git branch: 'main', url: 'https://github.com/israrkazmi/shopsmart-app.git'
+            }
+        }
 
         stage('Test') {
             steps {
                 sh '''
+                    python3 -m venv venv
                     . venv/bin/activate
+                    pip install -r requirements.txt selenium pytest
+                    # Run tests and generate the XML results file
                     pytest --junitxml=results.xml tests/
                 '''
             }
@@ -22,10 +35,10 @@ pipeline {
 
     post {
         always {
-            // 1. Parse results so Jenkins variables are populated
+            // 1. Tell Jenkins to read the test results file
             junit 'results.xml'
             
-            // 2. Send the dynamic email
+            // 2. Send the dynamic email to the requester (you or Qasim)
             emailext (
                 subject: "ShopSmart Build: ${currentBuild.fullDisplayName} - ${currentBuild.currentResult}",
                 body: """
@@ -47,6 +60,6 @@ pipeline {
                 ],
                 to: 'syedisrarkazmi091@gmail.com'
             )
-        } // Closes always
-    } // Closes post
-} // Closes pipeline
+        }
+    }
+}
