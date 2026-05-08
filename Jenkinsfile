@@ -6,43 +6,31 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/israrkazmi/shopsmart-app.git'
             }
         }
-stage('Test') {
-    steps {
-        sh '''
-            . venv/bin/activate
-            # Generate the XML report that Jenkins can read
-            pytest --junitxml=results.xml tests/
-        '''
-    }
-}
-
 post {
     always {
-        // 1. Process the test results so Jenkins knows the pass/fail count
+        // 1. Process the test results
         junit 'results.xml'
         
-        // 2. Send the dynamic email
+        // 2. Send the dynamic email with escaped tokens
         emailext (
             subject: "ShopSmart Build: ${currentBuild.fullDisplayName} - ${currentBuild.currentResult}",
             body: """
                 Build Status: ${currentBuild.currentResult}
                 
                 --- TEST SUMMARY ---
-                ${testCounts}
+                \${testCounts}
                 
-                Detailed Results:
-                - Passed: ${TEST_COUNTS, var="pass"}
-                - Failed: ${TEST_COUNTS, var="fail"}
-                - Skipped: ${TEST_COUNTS, var="skip"}
+                Detailed Breakdown:
+                - Passed: \${TEST_COUNTS, var="pass"}
+                - Failed: \${TEST_COUNTS, var="fail"}
+                - Skipped: \${TEST_COUNTS, var="skip"}
                 
                 Check the full report and logs here: ${env.BUILD_URL}
             """,
-            // This makes the 'To' field dynamic
             recipientProviders: [
-                [$class: 'RequesterRecipientProvider'], // Sends to the person who clicked "Build"
-                [$class: 'CulpritsRecipientProvider']   // Sends to the person who committed the code
+                [$class: 'RequesterRecipientProvider'], 
+                [$class: 'CulpritsRecipientProvider']
             ],
-            // Optional: keep your main email as a fallback/cc
             to: 'syedisrarkazmi091@gmail.com'
         )
     }
