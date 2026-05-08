@@ -36,21 +36,13 @@ pipeline {
             }
         }
     }
-    post {
-        always {
-            emailext (
-                to: 'kazmiisrar@gmail.com',
-                subject: "ShopSmart Tests: ${currentBuild.currentResult} - Build #${env.BUILD_NUMBER}",
-                body: """Build Result: ${currentBuild.currentResult}
-                
---------------------------------------------------
-AUTOMATED TEST SESSION LOG:
---------------------------------------------------
-\${BUILD_LOG, maxLines=100, escapeHtml=false}
---------------------------------------------------
-
-Full Build Details: ${env.BUILD_URL}""",
-            )
-        }
+post {
+    always {
+        emailext (
+            subject: "Status: ${currentBuild.fullDisplayName}",
+            body: "Build finished with status: ${currentBuild.currentResult}",
+            recipientProviders: [[$class: 'CulpritsRecipientProvider'], [$class: 'RequesterRecipientProvider']]
+        )
     }
+}
 }
