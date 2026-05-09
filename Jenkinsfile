@@ -2,26 +2,42 @@ pipeline {
     agent any
 
     environment {
-        // Adding Python to PATH just in case
-        PATH = "/var/lib/jenkins/workspace/shopsmart-pipeline/venv/bin:$PATH"
+        // Ensuring the virtual env is used for all commands
+        PATH = "${WORKSPACE}/venv/bin:${env.PATH}"
     }
 
     stages {
-        stage('Checkout') {
+        stage('Cleanup & Setup') {
             steps {
-                // Pulling your ShopSmart code
-                git branch: 'main', url: 'https://github.com/israrkazmi/shopsmart-app.git'
+                sh '''
+                    # Kill any old instances to prevent port conflicts
+                    pkill -f "python3 app.py" || true
+                    pkill -f "pytest" || true
+                    
+                    # Setup Environment
+                    python3 -m venv venv
+                    pip install -r requirements.txt selenium pytest
+                '''
             }
         }
 
         stage('Test') {
             steps {
+                // We start the app in the background and then run tests
                 sh '''
-                    python3 -m venv venv
                     . venv/bin/activate
-                    pip install -r requirements.txt selenium pytest
-                    # Run tests and generate the XML results file
+                    
+                    # 1. Start Flask app in background
+                    python3 app.py & 
+                    
+                    # 2. Wait for the app to actually be ready (important!)
+                    sleep 10
+                    
+                    # 3. Run Selenium tests and generate XML report
                     pytest --junitxml=results.xml tests/
+                    
+                    # 4. Cleanup background app after tests
+                    pkill -f "python3 app.py" || true
                 '''
             }
         }
@@ -35,10 +51,9 @@ pipeline {
 
     post {
         always {
-            // 1. Tell Jenkins to read the test results file
+            // Parse the XML results so Jenkins "sees" the 15 tests
             junit 'results.xml'
             
-            // 2. Send the dynamic email to the requester (you or Qasim)
             emailext (
                 subject: "ShopSmart Build: ${currentBuild.fullDisplayName} - ${currentBuild.currentResult}",
                 body: """
